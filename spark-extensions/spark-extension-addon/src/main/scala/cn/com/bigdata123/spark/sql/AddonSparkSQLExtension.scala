@@ -16,5 +16,11 @@ class AddonSparkSQLExtension extends (SparkSessionExtensions => Unit) {
         rule(session)
       }
     }
+
+    AddonSparkAnalysis.customCheckRules().foreach { rule =>
+      extensions.injectCheckRule { session =>
+        rule(session)
+      }
+    }
   }
 }
