@@ -1,22 +1,29 @@
-package cn.com.bigdata123.spark.sql.analysis
+package cn.com.bigdata123.spark.sql.listener
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.command.CreateDataSourceTableAsSelectCommand
 import org.apache.spark.sql.execution.datasources.{InsertIntoHadoopFsRelationCommand, LogicalRelation}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable, OptimizedCreateHiveTableAsSelectCommand}
+import org.apache.spark.sql.util.QueryExecutionListener
 
-class DataLineageAnalysisRunnable(sparkSession: SparkSession, plan: LogicalPlan) extends Runnable with Logging {
-
+class DataLineageQueryExecutionListener extends QueryExecutionListener with Logging{
   var sources: Seq[(TableIdentifier, Seq[String])] = Seq()
   var sinks: Seq[(TableIdentifier, Seq[String])] = Seq()
 
-  override def run(): Unit = {
+  override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
+    val user = qe.sparkSession.sparkContext.sparkUser
+    val appName = qe.sparkSession.sparkContext.appName
+    val appId = qe.sparkSession.sparkContext.applicationId
+    val appAttemptId = qe.sparkSession.sparkContext.applicationAttemptId
+    val analyzedPlan = qe.analyzed
 
-    plan match {
+    logInfo(s"user: $user, appName: $appName, appId: $appId, appAttemptId: $appAttemptId")
+
+    analyzedPlan match {
       // only match DataWritingCommand
 
       case InsertIntoHadoopFsRelationCommand(_, _, _, _, _, _, _, query, _, table, _, outputColumnNames) => doAnalyzeLineage(table, outputColumnNames, query)
@@ -34,21 +41,11 @@ class DataLineageAnalysisRunnable(sparkSession: SparkSession, plan: LogicalPlan)
     }
   }
 
-  private def doAnalyzeLineage(targetTable: Option[CatalogTable], outputColumnNames: Seq[String], query: LogicalPlan): Unit = {
-    val parser = sparkSession.sessionState.sqlParser
-    val analyzer = sparkSession.sessionState.analyzer
-    val optimizer = sparkSession.sessionState.optimizer
-    val planner = sparkSession.sessionState.planner
+  override def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit = {
+    logError(s"Exception during function $funcName, ${exception.toString}")
+  }
 
-    //    val sparkPlan =
-    //      if (!plan.analyzed) {
-    //        val analyzedPlan = analyzer.executeAndCheck(plan, new QueryPlanningTracker)
-    //        val optimizedPlan = optimizer.execute(analyzedPlan)
-    //        planner.plan(optimizedPlan).next()
-    //      } else {
-    //        val optimizedPlan = optimizer.execute(plan)
-    //        planner.plan(optimizedPlan).next()
-    //      }
+  private def doAnalyzeLineage(targetTable: Option[CatalogTable], outputColumnNames: Seq[String], query: LogicalPlan): Unit = {
 
     findSources(query)
     sinks = sinks :+ (targetTable.get.identifier, outputColumnNames)

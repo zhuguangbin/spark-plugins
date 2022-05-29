@@ -8,6 +8,7 @@ class TestAddonExtension extends FunSuite with BeforeAndAfterAll {
 
   val conf = new SparkConf()
     .set("spark.sql.catalog.local_hive1", "cn.com.bigdata123.spark.plugin.catalog.hive.V2ExternalCatalog")
+    .set("spark.sql.queryExecutionListeners", "cn.com.bigdata123.spark.sql.listener.DataLineageQueryExecutionListener")
 
   protected lazy val spark: SparkSession = SparkSession.builder()
     .appName("TestSparkApp")

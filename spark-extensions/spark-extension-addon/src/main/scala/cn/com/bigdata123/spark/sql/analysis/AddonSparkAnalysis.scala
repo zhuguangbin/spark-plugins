@@ -16,7 +16,7 @@ object AddonSparkAnalysis {
 
   def customCheckRules(): Seq[SparkSession => (LogicalPlan => Unit)] =
     Seq(
-      session => DataLineageCheckRule(session)
+//      session => DataLineageCheckRule(session)
     )
 }
 
