@@ -1,12 +1,8 @@
 package cn.com.bigdata123.spark.plugin.catalog.hive
 
-import cn.com.bigdata123.spark.plugin.catalog.hive.provider.write.{CsvProviderFileWriteBuilder, JsonProviderFileWriteBuilder}
-import cn.com.bigdata123.spark.plugin.catalog.hive.read.HiveFileFormatReadBuilder
+import cn.com.bigdata123.spark.plugin.catalog.hive.provider.write.{CsvProviderFileWriteBuilder, JsonProviderFileWriteBuilder, OrcProviderFileWriteBuilder, ParquetProviderFileWriteBuilder}
 import cn.com.bigdata123.spark.plugin.catalog.hive.util.CatalogUtil
 import cn.com.bigdata123.spark.plugin.catalog.hive.write.HiveFileFormatWriteBuilder
-
-import java.{util => jUtil}
-import cn.com.bigdata123.spark.plugin.catalog.hive.write._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.InternalBridge.V1Table
@@ -21,12 +17,15 @@ import org.apache.spark.sql.connector.read.ScanBuilder
 import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.execution.datasources.v2.csv.CSVScanBuilder
 import org.apache.spark.sql.execution.datasources.v2.json.JsonScanBuilder
+import org.apache.spark.sql.execution.datasources.v2.orc.OrcScanBuilder
+import org.apache.spark.sql.execution.datasources.v2.parquet.ParquetScanBuilder
 import org.apache.spark.sql.execution.datasources.{FileStatusCache, InMemoryFileIndex}
 import org.apache.spark.sql.hive.InternalHiveBridge.hiveClientImpl
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
+import java.{util => jUtil}
 import scala.collection.JavaConverters._
 
 private[catalog] class V2Table(val catalogName: String, val v2Catalog: V2ExternalCatalog, val delegate: CatalogTable) extends V1Table(delegate) with SupportsRead with SupportsWrite with SupportsAtomicPartitionManagement with Logging {
@@ -63,6 +62,8 @@ private[catalog] class V2Table(val catalogName: String, val v2Catalog: V2Externa
     provider match {
       case Some(f) if f == "json" => new JsonScanBuilder(ss, fileIndex, delegate.schema, dataSchema, options)
       case Some(f) if f == "csv" => CSVScanBuilder(ss, fileIndex, delegate.schema, dataSchema, options)
+      case Some(f) if f == "parquet" => ParquetScanBuilder(ss, fileIndex, delegate.schema, dataSchema, options)
+      case Some(f) if f == "orc" => OrcScanBuilder(ss, fileIndex, delegate.schema, dataSchema, options)
       case Some(f) if f == "hive" => read.HiveFileFormatReadBuilder(ss, fileIndex, delegate.schema, dataSchema, this)
       case _ => throw new IllegalArgumentException(s"Datasource V2 Scan not support provider ${provider.getOrElse("NULL")} currently..")
     }
@@ -73,6 +74,8 @@ private[catalog] class V2Table(val catalogName: String, val v2Catalog: V2Externa
     provider match {
       case Some(f) if f == "json" => new JsonProviderFileWriteBuilder(path, "JSON", JsonProviderFileWriteBuilder.supportsDataType, info, this)
       case Some(f) if f == "csv" => new CsvProviderFileWriteBuilder(path, "CSV", CsvProviderFileWriteBuilder.supportsDataType, info, this)
+      case Some(f) if f == "parquet" => new ParquetProviderFileWriteBuilder(path, "Parquet", ParquetProviderFileWriteBuilder.supportsDataType, info, this)
+      case Some(f) if f == "orc" => new OrcProviderFileWriteBuilder(path, "ORC", OrcProviderFileWriteBuilder.supportsDataType, info, this)
       case Some(f) if f == "hive" => new HiveFileFormatWriteBuilder(path, hiveClientImpl.toHiveTable(delegate), info, this)
       case _ => throw new IllegalArgumentException(s"Datasource V2 Write not support provider ${provider.getOrElse("NULL")} currently..")
     }
