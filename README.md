@@ -17,6 +17,8 @@ SHOW CATALOGS
 USE CATALOG <catalog name>
 ```
 
+NOTE: apache spark 3.3.0 has officially support this feature. [SPARK-35973](https://issues.apache.org/jira/browse/SPARK-35973)
+
 ## Senarios and Usecases
 
 1. current DW based on old hive version (eg. 1.x ), and new DW is built on latest new version(2.x or 3.x).
